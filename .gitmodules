@@ -1,0 +1,4 @@
+[submodule "lib/schedcat"]
+	path = lib/schedcat
+	url = https://github.com/gwsystems/schedcat.git
+	branch = rtas18-rt-smr
