@@ -63,11 +63,21 @@ def spinlock_naive_test(taskset_in, oh, conf):
 	ts = copy.deepcopy(taskset_in)
 	charge_spinlock_overheads(oh, ts, conf)
 	for t in ts:
+		t.uninflated_cost = t.cost
 		t.response_time = t.cost
+		t.response_old = 0
 
-	bounds.apply_task_fair_mutex_bounds(ts, 1, pi_aware=True)
-	if fp_schedulable_without_qui(ts): return (1, mem)
-	else: return (0, mem)	
+	while not response_times_consistent(ts):
+		for t in ts:
+		    t.cost = t.uninflated_cost
+		    if t.response_time < t.response_old:
+		    	print "[fp_test] Response times not monotonic! PID=%d" % os.getpid()
+		    	assert(False)
+		    t.response_old = t.response_time
+		bounds.apply_task_fair_mutex_bounds(ts, 1, pi_aware=True)
+		if not fp_schedulable_without_qui(ts): 
+			return (0, mem)	
+	return (1, mem)
 
 def spinlock_ilp_test(taskset_in, oh, conf, oh_scale=1):
 	mem = 0
@@ -99,15 +109,24 @@ def pfrwlock_test(taskset_in, oh, conf, oh_scale=1):
 	ts = copy.deepcopy(taskset_in)
 	charge_pfrwlock_overheads(oh, ts, conf, oh_scale)
 	for t in ts:
+		t.response_old = 0
 		t.uninflated_cost = t.cost
 		t.response_time = t.cost
 
-	bounds.apply_phase_fair_rw_bounds(ts, 1, pi_aware=True)
-        for t in ts:
-            if 'prio_inversion' in t.__dict__ and 'mc_type' in t.__dict__:
-                t.prio_inversion = 0
-	if fp_schedulable_without_qui(ts): return (1, mem, ts)
-	else: return (0, mem, None)
+	while not response_times_consistent(ts):
+		for t in ts:
+		    t.cost = t.uninflated_cost
+		    if t.response_time < t.response_old:
+		    	print "[fp_test] Response times not monotonic! PID=%d" % os.getpid()
+		    	assert(False)
+		    t.response_old = t.response_time
+		bounds.apply_phase_fair_rw_bounds(ts, 1, pi_aware=True)
+		for t in ts:
+		    if 'prio_inversion' in t.__dict__ and 'mc_type' in t.__dict__:
+		        t.prio_inversion = 0
+		if not fp_schedulable_without_qui(ts):
+			return (0, mem, None)
+	return (1, mem, ts)
 
 class Quiescence(object):
     def __init__(self, arpha = 0, beta = 0, mem = 0):
